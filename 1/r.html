@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>mychat_socket</title>
+  <meta charset="utf-8">
+  <link type="text/css" href="css/1.css" rel="stylesheet"/>
+</head>
+<body>
+<table>
+	<tr >
+		<input type="text" placeholder="请输入名字"  name="kick_name" id="kick_name"/>
+		<button type="button" class="kick">踢出群聊</button>
+	</tr>
+</table>
+<div class="container">
+  <div class="content">
+    <div class="show-area"></div>
+    <div class="write-area">
+    	<div>
+    		<input name="to_name" id="to_name" placeholder="输入接收方的名字"></input>
+    	</div>
+      <div>
+        <textarea name="message" id="message" cols="38" rows="4" placeholder="输入信息"></textarea>
+      </div>
+      <div>
+        <button  class="send">发送</button>
+        <button class="record">聊天记录</button>
+    </div>
+    </div>
+    
+  </div>
+  <div class="client_list" id="gk">
+  	<p style="text-align: center;">在线列表</p>
+  </div>
+</div>
+
+<script src="js/jquery-2.1.0.js"></script>
+
+<script>
+  $(function(){
+  	
+  	var name='管理员';
+    var wsurl = 'ws://192.168.21.102:9505/';
+    var websocket;
+    var i = 0;
+    if(window.WebSocket){
+      websocket = new WebSocket(wsurl);
+
+      //连接建立
+      websocket.onopen = function(evevt){
+      	if(!name)
+        {
+            show_prompt();
+        }
+        $('.show-area').append('<p>连接服务器成功!</p>');
+        $('.show-area').append('<p>欢迎您！'+name+'</p>');
+        var msg = {
+        	type:'login',
+          message: 'null',
+          name   : name,
+          to_name:'null'
+        };
+        websocket.send(JSON.stringify(msg));
+      }
+      
+      function show_prompt(){  
+        name = prompt('输入你的名字：', '');
+        if(!name || name=='null'){  
+            name = '游客';
+        }
+    	}
+      //收到消息
+      websocket.onmessage = function(event){
+        var msg = JSON.parse(event.data); //解析收到的json消息数据
+
+        var type = msg.type; // 消息类型
+        var umsg = msg.message; //消息文本
+        var uname = msg.name; //发送人
+        i++;
+        if(type == 'usermsg'){
+          $('.show-area').append('<p ><span>' + uname + ': </span>' + umsg + '</p>');
+        }
+        if(type == 'system'){
+          $('.show-area').append('<p>' + umsg + '</p>');
+        }
+				if(type=='login'){
+					var userlist_window = $("#gk");
+					userlist_window.empty();
+					$('.client_list').append('<p style="text-align: center;">在线列表</p>');
+					for(var k=0;k<umsg.length;k++){
+						if(umsg[k]==name){
+							$('.client_list').append('<p style="color: red;">'+umsg[k] + '</p>');
+						}
+						else{
+							$('.client_list').append('<p>'+umsg[k] + '</p>');
+						}
+					}
+				}
+				if(type=='priv'){
+					$('.show-area').append('<p ><span>' + uname + '对你说: </span>' + umsg + '</p>');
+				}
+        $('#message').val('');
+      }
+
+      websocket.onerror = function(event){
+        i++;
+        $('.show-area').append('<p>连接错误</p>');
+       
+      }
+
+      websocket.onclose = function(event){
+        i++;
+        $('.show-area').append('<p>连接关闭</p>');
+        
+      }
+
+			function kick(){
+        var kick_name=$('#kick_name').val();
+        var message = kick_name+'已被踢出';
+        if(!kick_name){
+          alert('名字不能为空!');
+          return false;
+        }
+	    	var msg = {
+	    		type: 'kick',
+	      	message: message,
+	      	name   : name,
+	      	to_name:kick_name
+	    	};
+	    	//$('.show-area').append('<p >'+kick_name+'已被踢出</p>');
+        try{
+          websocket.send(JSON.stringify(msg));
+        }
+        catch(ex){
+          console.log(ex);
+        }
+			}
+
+      function send(){
+        var message = $('#message').val();
+        var to_name=$('#to_name').val();
+        if(!message){
+          alert('发送消息不能为空!');
+          return false;
+        }
+        if(to_name){
+        	var msg = {
+        		type: 'priv',
+          	message: message,
+          	name   : name,
+          	to_name:to_name
+        	};
+        	$('.show-area').append('<p >你对'+to_name+'说：'+message+'</p>');
+        	$('#message').val('');
+        }
+        else{
+	        var msg = {
+	        	type: 'mess',
+	          message: message,
+	          name   : name,
+	          to_name:'ALL'
+	        };
+        }
+        try{
+          websocket.send(JSON.stringify(msg));
+        }
+        catch(ex){
+          console.log(ex);
+        }
+      }
+      
+      function record(){
+      	window.open("http://192.168.21.102:8080/liaotianshi/zhuye.php");
+      }
+
+      //按下enter键发送消息
+      $(window).keydown(function(event){
+        if(event.keyCode == 13){
+          send();
+        }
+      });
+
+      //点发送按钮发送消息
+      $('.send').bind('click', function(){
+        send();
+      });
+      
+      $('.kick').bind('click',function(){
+      	kick();
+      })
+			
+			$('.record').bind('click',function(){
+				record();
+			})
+    }
+    
+    else{
+      alert('该浏览器不支持web socket');
+    }
+
+  });
+</script>
+</body>
+</html>
